@@ -8,8 +8,9 @@ int main(int argc, char const *argv[])
 
 	Plot plot;
 	plot.init(".");
-	exp.setEnvironment(1e-1*eV, 4000*eV, 10*eV, 1e5);
-	//exp.setEnvironment(3e-2*eV, 10*eV, 0.0010*eV, 1e5);
+	//exp.setEnvironment(1e-1*eV, 4000*eV, 10*eV, 1e5);
+	//exp.setEnvironment(3e-2*eV, 4000*eV, pow(10,0.02), 1e5);
+	exp.setEnvironment(3e-2*eV, 30*eV, pow(10,0.02), 1e5);
 	exp.setLaser(1e-6, 20e-6, 250e-15, 1e5, 20);
 	exp.initMaterial(Cu,"DOSCAR");
 	std::vector<double> rates;

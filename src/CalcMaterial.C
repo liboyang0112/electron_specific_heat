@@ -188,6 +188,53 @@ double dirac_int(double x, double j){
 
 void CalcMaterial::initMaterial(material m, std::string filename){
 	mat = m;
+	readLine("/home/boyang/softwares/electron_specific_heat/config/ionize.txt",mat.name,ionize);
+
+	std::ifstream fileenergyLevel("/home/boyang/softwares/electron_specific_heat/config/energyLevel.txt");
+	if (!fileenergyLevel)
+	{
+			std::cerr << "File " << "/home/boyang/softwares/electron_specific_heat/config/energyLevel.txt" << " could not be opened" << std::endl;
+			exit(0);
+	}
+	std::string inputline;
+	std::string matname;
+	double altmp,eltmp;
+	double neleremain = mat.ele_number;
+	if(bareAtomOrbit){
+		for (int i = 1; i < bareAtomOrbit+1; ++i)
+		{
+			if(neleremain<2*i*i) {
+				a_l.push_back(neleremain);
+				epsilon_l.push_back(-13.6*mat.ele_number*mat.ele_number/i/i);
+				a_l.push_back(2*i*i-neleremain);
+				epsilon_l.push_back(-13.6*mat.ele_number*mat.ele_number/i/i+1);
+			}
+
+			else {
+				neleremain-=2*i*i;
+				a_l.push_back(2*i*i);
+				epsilon_l.push_back(-13.6*mat.ele_number*mat.ele_number/i/i);
+			}
+		}
+	}else if(useIon){
+		for (uint i = 0; i < ionize.size(); ++i)
+		{
+			a_l.push_back(1);
+			epsilon_l.push_back(-ionize[i]*1e6/q_e/N_A);
+		}
+	}else while(getline(fileenergyLevel,inputline)){
+		if(inputline.find(mat.name)!=std::string::npos){
+			std::stringstream ss(inputline);
+			ss>>matname;
+			while(ss){
+				ss>>altmp>>eltmp; //kJ/mol
+				a_l.push_back(altmp);
+				epsilon_l.push_back(eltmp);
+			}
+			break;
+		}
+	}
+
 	readDOS(filename);
 }
 
@@ -238,7 +285,48 @@ double CalcMaterial::latticePlasmaDOSInt(double x, double y, double power){
 	{
 		if(nEle_inner<=0) break;
 		nEle_inner-=a_l[i];
-		result += a_l[i]*pow(epsilon_l[i],power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+		result += a_l[i]*pow(epsilon_l[i]/fermiEnergy,power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+	}
+	return result;
+}
+
+double CalcMaterial::latticePlasmaDOSIntInner(double x, double y, double power){
+	double result = 0;
+	for (double l = 0; l < 1 + mat.workFunc/fermiEnergy; l+=interval)
+	{
+		result+=DOS.at(int(l/interval)) * pow(l,power) / (exp((l-1-mat.workFunc/fermiEnergy-x)/y)+1);
+	}
+	result *= interval;
+	int nEle_inner = mat.ele_number-nEle;
+	for (uint i = 0; i < a_l.size(); ++i)
+	{
+		if(nEle_inner<=0) break;
+		nEle_inner-=a_l[i];
+		result += a_l[i]*pow(epsilon_l[i]/fermiEnergy,power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+	}
+	return result;
+}
+
+double CalcMaterial::DLatticePlasmaDOSIntInner(double x, double y, double xp, double yp, double power){
+	double result = 0;
+	double e1,e2,de;
+	for (double l = 0; l < 1 + mat.workFunc/fermiEnergy; l+=interval)
+	{
+		e1=exp((l-1-mat.workFunc/fermiEnergy-x)/y);
+		e2=exp((l-1-mat.workFunc/fermiEnergy-xp)/yp);
+		de = (exp((l-1-mat.workFunc/fermiEnergy-xp)/yp-(l-1-mat.workFunc/fermiEnergy-x)/y)-1)*e1;
+		result+=DOS.at(int(l/interval)) * pow(l,power) *(de /(e1+1)/(e2+1));
+	}
+	result *= interval;
+	int nEle_inner = mat.ele_number-nEle;
+	for (uint i = 0; i < a_l.size(); ++i)
+	{
+		if(nEle_inner<=0) break;
+		nEle_inner-=a_l[i];
+		e1=exp((epsilon_l[i]/fermiEnergy-x)/y);
+		e2=exp((epsilon_l[i]/fermiEnergy-xp)/yp);
+		de = (exp((epsilon_l[i]/fermiEnergy-xp)/yp-(epsilon_l[i]/fermiEnergy-x)/y)-1)*e1;
+		result += a_l[i]*pow(epsilon_l[i]/fermiEnergy,power)*(de /(e1+1)/(e2+1));
 	}
 	return result;
 }
@@ -247,12 +335,36 @@ double CalcMaterial::gasPlasmaDOSInt(double x, double y, double power, double Vr
 	double result = 1.5*pow(y,3./2+power)*dirac_int(x/y,0.5+power)*Vratio;
 	for (uint i = 0; i < a_l.size(); ++i)
 	{
-		result += a_l[i]*pow(epsilon_l[i],power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+		result += a_l[i]*pow(epsilon_l[i]/fermiEnergy,power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+	}
+	return result;
+}
+
+double CalcMaterial::gasPlasmaDOSIntInner(double x, double y, double power){
+	double result = 0;
+	for (uint i = 0; i < a_l.size(); ++i)
+	{
+		result += a_l[i]*pow(epsilon_l[i]/fermiEnergy,power) / (exp((epsilon_l[i]/fermiEnergy-x)/y)+1);
+	}
+	return result;
+}
+
+double CalcMaterial::DGasPlasmaDOSIntInner(double x, double y, double xp, double yp, double power){
+	double result = 0;
+	double e1,e2,de;
+	for (uint i = 0; i < a_l.size(); ++i)
+	{
+		e1=exp((epsilon_l[i]/fermiEnergy-x)/y);
+		e2=exp((epsilon_l[i]/fermiEnergy-xp)/yp);
+		de = (exp((epsilon_l[i]/fermiEnergy-xp)/yp-(epsilon_l[i]/fermiEnergy-x)/y)-1)*e1;
+		de = a_l[i]*( de/(e1+1)/(e2 +1));
+		result +=pow(epsilon_l[i]/fermiEnergy,power)*de;
 	}
 	return result;
 }
 
 double CalcMaterial::DOSIntI(double x, double y, double power, double Vratio){
+	if(Vratio==0) Vratio = VratioDefault;
 	switch(DOSmode){
 		case lattice_plasma:
 		return latticePlasmaDOSInt(x, y, power);
@@ -262,6 +374,28 @@ double CalcMaterial::DOSIntI(double x, double y, double power, double Vratio){
 		return freeDOSInt(x,y,power);
 		default:
 		return DOSInt(x, y, power);
+	}
+}
+
+double CalcMaterial::DOSIntInnerI(double x, double y, double power){
+	switch(DOSmode){
+		case lattice_plasma:
+		return latticePlasmaDOSIntInner(x, y, power);
+		case gas_plasma:
+		return gasPlasmaDOSIntInner(x, y, power);
+		default:
+		return 0;
+	}
+}
+
+double CalcMaterial::DDOSIntInnerI(double x, double y, double xp, double yp, double power){
+	switch(DOSmode){
+		case lattice_plasma:
+		return DLatticePlasmaDOSIntInner(x, y, xp, yp, power);
+		case gas_plasma:
+		return DGasPlasmaDOSIntInner(x, y, xp, yp, power);
+		default:
+		return 0;
 	}
 }
 
@@ -277,6 +411,7 @@ double CalcMaterial::latticePlasmaZ(double x, double y){
 
 
 double CalcMaterial::gasPlasmaZ(double x, double y, double Vratio){
+	if(Vratio==0) Vratio = VratioDefault;
 	return 1.5*pow(y,3./2)*dirac_int(x/y,0.5)*Vratio;
 }
 
@@ -431,7 +566,7 @@ void CalcMaterial::plotDOSNandF(double x, double y, std::string savename){\
 			Dl.push_back(0);
 			N.push_back(f.back()*Dl.back()/100);
 		}
-		plot.plotTripple("DOS", "electron density", "Occupation (%)", epsilon, Dl, N, f, "l", "inner_"+savename);
+		if(doPlots) plot.plotTripple("DOS", "electron density", "Occupation (%)", epsilon, Dl, N, f, "l", "inner_"+savename);
 	}
 	epsilon.clear();
 	Dl.clear();
@@ -494,11 +629,11 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 	std::vector<double> C_e_highT;
 	std::vector<double> dC_e;
 	std::vector<double> K_es;
-	std::vector<double> ionize;
+	std::vector<double> Ubar;
 	startT = sT;
 	endT = eT;
 	intervalT = iT;
-
+	logstepT = iT;
 	C_e.clear();
 	C_e_lowT.clear();
 	C_e_highT.clear();
@@ -509,6 +644,11 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 	xs.clear();
 	Ts.clear();
 	mus.clear();
+	Z_l.clear();
+	TsineV.clear();
+	TsinEpsilon.clear();
+	Uin.clear();
+	C_l.clear();
 	double Nk=mat.rho*N_A/mat.n*k_B;
 	const gsl_root_fsolver_type * T = gsl_root_fsolver_brent;
 	gsl_root_fsolver * s = gsl_root_fsolver_alloc (T);
@@ -526,55 +666,14 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 	bool plotyet = 0;
 	int i = 0;
 
-
-	std::ifstream fileenergyLevel("/home/boyang/softwares/electron_specific_heat/config/energyLevel.txt");
-	if (!fileenergyLevel)
-	{
-			std::cerr << "File " << "/home/boyang/softwares/electron_specific_heat/config/energyLevel.txt" << " could not be opened" << std::endl;
-			exit(0);
-	}
-	std::string inputline;
-	std::string matname;
-	double altmp,eltmp;
-	if(bareAtomOrbit){
-		for (int i = 1; i < bareAtomOrbit+1; ++i)
-		{
-			a_l.push_back(2*i*i);
-			epsilon_l.push_back(-13.6*mat.ele_number*mat.ele_number/i/i);
-		}
-	}else while(getline(fileenergyLevel,inputline)){
-		if(inputline.find(mat.name)!=std::string::npos){
-			std::stringstream ss(inputline);
-			ss>>matname;
-			while(ss){
-				ss>>altmp>>eltmp; //kJ/mol
-				a_l.push_back(altmp);
-				epsilon_l.push_back(eltmp);
-			}
-			break;
-		}
-	}
-
-	std::ifstream fileionize("/home/boyang/softwares/electron_specific_heat/config/ionize.txt");
-	if (!fileionize)
-	{
-			std::cerr << "File " << "/home/boyang/softwares/electron_specific_heat/config/ionize.txt" << " could not be opened" << std::endl;
-			exit(0);
-	}
-	double ionizeE;
-	while(getline(fileionize,inputline)){
-		if(inputline.find(mat.name)!=std::string::npos){
-			std::stringstream ss(inputline);
-			ss>>matname;
-			while(ss){
-				ss>>ionizeE; //kJ/mol
-				ionize.push_back(ionizeE*1e6/N_A);
-			}
-			break;
-		}
-	}
-	fileionize.close();
-	for (double T = startT; T < endT; T+=intervalT)
+	double prevX=0;
+	double prevY=0;
+	//std::vector<double> dUin;
+	std::vector<double> dZ_l;
+	//dUin.push_back(0);
+	dZ_l.push_back(0);
+	double Uin0=0;
+	for (double T = startT; T < endT;)
 	{
 		y=T/fermiEnergy/q_e*k_B;
 		params.y=y;
@@ -584,14 +683,36 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 		while(1){
 			gsl_root_fsolver_iterate(s);
 			root=gsl_root_fsolver_root(s);
-			if(fabs(solution-root)<1e-100) break;
+			if(fabs(solution-root)<1e-300) break;
 			solution=root;
 		}
 		double U_e_tmp=DOSIntI(solution,y,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B);
-		if(DOSmode == lattice_plasma) Z_l.push_back(latticePlasmaZ(solution, y));
-		else if(DOSmode == gas_plasma)  Z_l.push_back(gasPlasmaZ(solution, y));
+		if(DOSmode == lattice_plasma) {
+			Z_l.push_back(latticePlasmaZ(solution, y));
+			if(i>0) {
+				Uin.push_back(DOSIntInnerI(solution,y,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B)-Uin0);
+//				dUin.push_back(DDOSIntInnerI(solution,y,prevX,prevY,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B));
+//				dZ_l.push_back(DDOSIntInnerI(solution,y,prevX,prevY,0));
+			}else{
+				Uin0=DOSIntInnerI(solution,y,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B);
+				Uin.push_back(0);
+			}
+		}
+		else if(DOSmode == gas_plasma) {
+			Z_l.push_back(gasPlasmaZ(solution, y));
+			if(i>0) {
+				Uin.push_back(DOSIntInnerI(solution,y,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B)-Uin0);
+//				dUin.push_back(DDOSIntInnerI(solution,y,prevX,prevY,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B));
+//				dZ_l.push_back(DDOSIntInnerI(solution,y,prevX,prevY,0));
+			}else{
+				Uin0=DOSIntInnerI(solution,y,1)*(dimentionless?1:Nk*fermiEnergy*q_e/k_B);
+				Uin.push_back(0);
+			}
+			
+		}
  		U_e.push_back(U_e_tmp);
-		C_e.push_back((U_e_tmp-lastU)/intervalT*(dimentionless?fermiEnergy*q_e/k_B:1));
+		if(i>0) C_e.push_back((U_e_tmp-lastU)/intervalT*(dimentionless?fermiEnergy*q_e/k_B:1));
+		else C_e.push_back(0);
 		C_e_highT.push_back(3./2*(dimentionless?1:Nk));
 		//if(i>0) C_e_lowT.push_back(std::min(C_e_lowT.back()+PI*PI/2*intervalT*Nk/fermiEnergy/q_e*k_B,C_e_highT.back()));
 		C_e_lowT.push_back(T*PI*PI/2/fermiEnergy/q_e*k_B*(dimentionless?1:Nk));
@@ -605,18 +726,32 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 		C_l.push_back(3*Nk*debye_int(mat.debyeTemprature/T));
 		lastU=U_e_tmp;
 		Gs.push_back(computeG(solution,y,mat.lambdaOmega2_meV)*N_A*mat.rho/mat.n/fermiEnergy*q_e/k_B);
-		if((y>0.5||T >= endT-intervalT)&&!plotyet){
-			plotDOSNandF(solution, y, "NandFAt0.5.pdf");
-			plotyet=1;
-		}
+		if(doPlots)
+			if((y>0.5||T >= endT-intervalT)&&!plotyet){
+				plotDOSNandF(solution, y, "NandFAt0.5.pdf");
+				plotyet=1;
+			}
 		i++;
+		prevX=solution;
+		prevY=y;
+		if(logstepT) {
+			intervalT = (logstepT-1)*T;
+			T+=intervalT;
+		}
+		else T+=intervalT;
 	}
+	//Ubar.push_back(0);
+	//for (uint i = 0; i < Z_l.size()-1; ++i)
+	//{
+	//	Ubar.push_back(-dUin[i]/dZ_l[i]);
+	//}
+	//Ubar[0]=Ubar[1];
 	C_e[0]=2*C_e[1]-C_e[2];
 	if(C_e[0]<0) C_e[0]=0;
 	dC_e[0]=dC_e[1]=2*dC_e[2]-dC_e[3];
 	dC_e.push_back(dC_e.back());
 	auto smootheddC = smooth(smooth(smooth(dC_e)));
-	for (double T = startT; T < endT; T+=intervalT)
+	for (double T = startT; T < endT; T*=logstepT)
 	{
 		K_es.push_back(getK_e(300,T));
 	}
@@ -628,7 +763,8 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 //	plot.plotSingle("${dC_v^e/dy/Nk}$", ys, smootheddC, "${y}$", "dC_V.pdf");
 //	plot.plotSingle("${U/T_{F}}Nk$", ys, U_e, "${y}$", "U.pdf");
 
-		if(DOSmode >= 2) plot.plotSingle("Degree of ionization,", TsInUnit(), Z_l, TUnit, "Z_l.pdf");
+		if(DOSmode >= 2) plot.plotSingle("Degree of ionization", TsInUnit(), Z_l, TUnit, "Z_l.pdf");
+//		if(DOSmode >= 2) plot.plotSingle("d Degree of ionization", TsInUnit(), dZ_l, TUnit, "dZ_l.pdf");
 		if(DOSmode >= 2) 
 			plot.plotSingle("${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$", TsInUnit(), smooth(C_e), TUnit, "C_e.pdf");
 
@@ -640,6 +776,8 @@ int CalcMaterial::calculate(double sT, double eT, double iT)
 		plot.plotSingle("${dC_e/dT}$/J${\\cdot}$K${^{-2}\\cdot}$m${^{-3}}$", TsInUnit(), smootheddC, TUnit, "dC_e.pdf");
 		std::string uunit = dimentionless?"${\\epsilon_F}$":"J${\\cdot}$m${^{-3}}$";
 		plot.plotSingle("${U}$/"+uunit, TsInUnit(), U_e, TUnit, "U.pdf");
+//		plot.plotSingleLogXY("${\\bar{U}}$/"+uunit, TsInUnit(), Ubar, TUnit, "Ubar.pdf");
+		plot.plotSingle("${\\bar{U}}$/"+uunit, TsInUnit(), Uin, TUnit, "Uin.pdf");
 		plot.plotSingle("${C_l}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$",TsInUnit(),C_l,TUnit,"C_l.pdf");
 		plot.plotDouble("${C_l}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$","${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$", TsInUnit(), C_l, C_e,TUnit,"C_lC_e.pdf");
 		plot.plotSingle("${K_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-1}}$s${^{-1}}$",TsInUnit(),K_es,TUnit,"K_e.pdf");
@@ -698,12 +836,12 @@ int CalcMaterial::calculateOptical(){
 	}
 	double param1 = gamma0/(getOhmCollisionRate(mat.conductivity, N_n)+getOhmCollisionRate(1./mat.rhoee/90000, N_n));
 	//std::cout<<"param1: "<<param1<<std::endl;
-	for (int T_l = startT; T_l < endT; T_l+=intervalT)
+	for (int T_l = startT; T_l < endT; T_l*=logstepT)
 	{
 		Rs.emplace_back();
 		alphas.emplace_back();
 		double v_ep=getOhmCollisionRate(mat.conductivity*300/T_l, N_n);
-		for (int T_e = startT; T_e < endT; T_e+=intervalT)
+		for (int T_e = startT; T_e < endT; T_e*=logstepT)
 		{
 			double v_ee=getOhmCollisionRate(1./mat.rhoee/T_e/T_e, N_n);
 			double v_pl= 2*PI*getPlasmaCollisionRate(N_n, T_e)*hbar/q_e;
@@ -765,7 +903,7 @@ int CalcMaterial::calculateOptical(){
 	F.params = &radparams;
 	std::vector<double> hs;
 	std::vector<double> Ps;
-	for (double T_e = startT; T_e < endT; T_e+=intervalT)
+	for (double T_e = startT; T_e < endT; T_e*=logstepT)
 	{
 		radparams.T_e = T_e;
 		radP.emplace_back();
@@ -793,36 +931,78 @@ double CalcMaterial::averageZ(CalcMaterial *source){
 	std::vector<double> U_e_orig; // electron internal energy
 	std::vector<double> mus_orig; // chemical potential
 	std::vector<double> Z_l_orig;
+	std::vector<double> Uin_orig;
 
-	for (int i = 0; i < Z_l.size(); ++i)
+	for (uint i = 0; i < Z_l.size(); ++i)
 	{
 		C_e_orig.push_back(C_e[i]);
 		U_e_orig.push_back(U_e[i]);
 		mus_orig.push_back(mus[i]);
 		Z_l_orig.push_back(Z_l[i]);
-		double r2 = (Z_l[i]+source->Z_l[i])/2/mat.ele_number;
-		//double r2 = Z_l[i]/mat.ele_number;
+		Uin_orig.push_back(Uin[i]);
+		//double r2 = 1./2;
+		//double r2 = sqrt((Z_l[i]*source->Z_l[i]))/mat.ele_number;
+		double r2 = Z_l[i]/mat.ele_number;
 		double r1 = 1-r2;
 		Z_l[i] = r1*Z_l[i] + r2*source->Z_l[i];
 		C_e[i] = r1*C_e[i] + r2*source->C_e[i];
 		mus[i] = r1*mus[i] + r2*source->mus[i];
-		U_e[i] = r1*U_e[i] + r2*source->U_e[i];
+		if(i==0) {
+			U_e[0] = 0;
+			for (int j = 0; j < mat.ele_number; ++j)
+			{
+				//printf("ionize[%d]=%e\n",j,ionize[j]);
+				U_e[0]-=ionize[j]/mat.n*mat.rho*1e6;
+			}
+		}else{
+			U_e[i] = C_e[i]*(Ts[i]-Ts[i-1])+U_e[i-1];
+		}
+		Uin[i] = r1*Uin[i] + r2*source->Uin[i];
 	}
-	if(DOSmode >= 2)
-	plot.plotTripple("Degree of ionization, avg",
-		"Degree of ionization, gas",
-		"Degree of ionization, nuclei",
-		TsInUnit(), Z_l, Z_l_orig, source->Z_l, TUnit, "Z_l_averaged.pdf");
-	plot.plotTripple("${\\mu}$/eV avg", 
-		"${\\mu}$/eV gas",
-		"${\\mu}$/eV nuclei",
-		TsInUnit(), mus, mus_orig, source->mus, TUnit, "mu_averaged.pdf");
-	plot.plotTripple("${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ avg",
-		"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ gas",
-		"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ nuclei",
-		TsInUnit(), smooth(C_e), smooth(C_e_orig), smooth(source->C_e), TUnit, "C_e_averaged.pdf");
-	plot.plotTripple("${U}$/J${\\cdot}$m${^{-3}}$ avg", 
-		"${U}$/J${\\cdot}$m${^{-3}}$ gas",
-		"${U}$/J${\\cdot}$m${^{-3}}$ nuclei",
-		TsInUnit(), U_e, U_e_orig, source->U_e, TUnit, "U_e_averaged.pdf");
+	if(doPlots){
+		if(DOSmode >= 2)
+		plot.plotTripple("Degree of ionization, avg",
+			"Degree of ionization, gas",
+			"Degree of ionization, nuclei",
+			TsInUnit(), Z_l, Z_l_orig, source->Z_l, TUnit, "Z_l_averaged.pdf");
+		plot.plotTripple("${\\mu}$/eV avg", 
+			"${\\mu}$/eV gas",
+			"${\\mu}$/eV nuclei",
+			TsInUnit(), mus, mus_orig, source->mus, TUnit, "mu_averaged.pdf");
+		plot.plotTripple("${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ avg",
+			"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ gas",
+			"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ nuclei",
+			TsInUnit(), smooth(C_e), smooth(C_e_orig), smooth(source->C_e), TUnit, "C_e_averaged.pdf");
+		plot.plotTripple("${U}$/J${\\cdot}$m${^{-3}}$ avg", 
+			"${U}$/J${\\cdot}$m${^{-3}}$ gas",
+			"${U}$/J${\\cdot}$m${^{-3}}$ nuclei",
+			TsInUnit(), U_e, U_e_orig, source->U_e, TUnit, "U_e_averaged.pdf");
+		plot.plotTripple("${\\bar{U}}$/J${\\cdot}$m${^{-3}}$ avg", 
+			"${\\bar{U}}$/J${\\cdot}$m${^{-3}}$ gas",
+			"${\\bar{U}}$/J${\\cdot}$m${^{-3}}$ nuclei",
+			TsInUnit(), Uin, Uin_orig, source->Uin, TUnit, "Uin_averaged.pdf");
+	}
+	return 0;
+}
+
+void CalcMaterial::write(std::string filename){
+	std::ofstream outfile;
+	outfile.open(filename, std::ios::out);
+	outfile<<"Te";
+	for (uint i = 0; i < TsineV.size(); ++i)
+	{
+		outfile<<" "<<TsineV[i];
+	}
+	outfile<<std::endl<<"Z";
+	for (uint i = 0; i < Z_l.size(); ++i)
+	{
+		outfile<<" "<<Z_l[i];
+	}
+	outfile<<std::endl<<"Uin";
+	for (uint i = 0; i < Uin.size(); ++i)
+	{
+		outfile<<" "<<Uin[i];
+	}
+	printf("Written to file %s\n", filename.c_str());
+	outfile.close();
 }

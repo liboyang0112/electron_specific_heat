@@ -75,5 +75,19 @@ int main(int argc, char const *argv[])
 	plot.plotSingle("R",wls,Rs,"reached energy","R.pdf");
 	plot.plotSingle("incs",wls,incs,"reached energy","incs.pdf");
 */
+	std::vector<double> vZvsV;
+	std::vector<double> vUbarvsV;
+	std::vector<double> vZvsT[190];
+	std::vector<double> vUbarvsT[190];
+	std::vector<double> vT;
+	for (double vol = 1; vol < 20; vol+=1)
+	{
+		if(vol==1) readLine("V_"+std::to_string(vol),"T",vT);
+		readLine("V_"+std::to_string(vol),"Z",vZvsT[int(vol-1)]);
+		readLine("V_"+std::to_string(vol),"Ubar",vUbarvsT[int(vol-1)]);
+	}
+
+	plot.plotTripple("Z, rV=1","Z, rV=2","Z, rV=3",vT,vZvsT[0],vZvsT[1],vZvsT[2],"T/eV","ZdiffV.pdf");
+	plot.plotTripple("Ubar, rV=1","Ubar, rV=2","Ubar, rV=3",vT,vUbarvsT[0],vUbarvsT[1],vUbarvsT[2],"T/eV","UbardiffV.pdf");
 	return 0;
 }

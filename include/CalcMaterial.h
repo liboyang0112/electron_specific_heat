@@ -26,6 +26,7 @@ public:
 	~CalcMaterial(){}
 	void initMaterial(material m, std::string filename);
 	std::string TUnit="T/eV";
+	std::vector<double> ionize;
 	std::vector<double> DOS;
 	std::vector<double> epsilon_l; // energy level l
 	std::vector<double> a_l;  // degeneration of l energy level
@@ -42,6 +43,7 @@ public:
 	std::vector<double> ys;
 	std::vector<double> xs;
 	std::vector<double> Z_l;
+	std::vector<double> Uin;
 	Plot plot;
 	material mat;
 	double lambda;
@@ -52,19 +54,28 @@ public:
 	double startT;
 	double endT;
 	double intervalT;
+	double logstepT = 0;
 	double latticeResolution = 1e-9;
 	bool doPlots = 1;
+	bool useIon = 0;
 	int bareAtomOrbit = 0;
 	bool dimentionless = 0;
+	double VratioDefault = 1;
 	enum mode {free, bloch, lattice_plasma, gas_plasma} DOSmode;
 	void readDOS(std::string filename);
 	void freeDOS();
 	void plotDOSNandF(double x, double y, std::string savename);
-	double DOSIntI(double x, double y, double power=0, double Vratio=1);
+	double DOSIntI(double x, double y, double power=0, double Vratio=0);
+	double DOSIntInnerI(double x, double y, double power=0);
+	double DDOSIntInnerI(double x, double y,double xp, double yp, double power=0);
 	double DOSInt(double x, double y, double power=0, double start=0, double end=0);
 	double gasPlasmaDOSInt(double x, double y, double power=0, double Vratio=1);
-	double gasPlasmaZ(double x, double y, double Vratio=1);
 	double latticePlasmaDOSInt(double x, double y, double power=0);
+	double gasPlasmaDOSIntInner(double x, double y, double power=0);
+	double latticePlasmaDOSIntInner(double x, double y, double power=0);
+	double DGasPlasmaDOSIntInner(double x, double y,double xp, double yp, double power=0);
+	double DLatticePlasmaDOSIntInner(double x, double y,double xp, double yp, double power=0);
+	double gasPlasmaZ(double x, double y, double Vratio=0);
 	int calculate(double sT, double eT, double iT);
 	int calculateOptical();
 	std::vector<double> TsInUnit(){
@@ -105,5 +116,6 @@ public:
 	double getrTR(double rT_e, double rT_l){return interpolate(rT_e,rT_l,Rs);}
 	double averageZ(CalcMaterial *source);
 	double getK_e(double T_l, double T_e){return (conductivity_c+T_e)/(conductivity_a*T_l+conductivity_b*T_e*T_e)*getC_e(T_e);}
+	void write(std::string filename);
 };
 #endif

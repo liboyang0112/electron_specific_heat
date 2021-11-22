@@ -47,43 +47,64 @@ public:
 		//matData->freeDOS();
 		//matData->calculate(temprature, maxTemprature, tempraturePrecision);
 
+		
+		double Vratio = 1;
+		CalcMaterial ionData("ion");
+		ionData.DOSmode=ionData.gas_plasma;
+		//ionData.bareAtomOrbit=4;
+		ionData.useIon=1;
+		ionData.initMaterial(workPiece, DOS);
 		matData = new CalcMaterial("lattice");
 		matData->nEle=11;
+		matData->useIon=1;
 		matData->DOSmode = matData->lattice_plasma;
 		matData->lambda = drilling.lambda;
 		matData->initMaterial(workPiece, DOS);
-		matData->calculate(temprature, maxTemprature, tempraturePrecision);
+		if(0) {
+			ionData.VratioDefault = Vratio;
+			ionData.calculate(temprature, maxTemprature, tempraturePrecision);
+			exit(0);
+		}
 		
-		CalcMaterial ionData("nuclei");
-		ionData.DOSmode=ionData.gas_plasma;
-		ionData.bareAtomOrbit=4;
-		ionData.initMaterial(workPiece, DOS);
-		ionData.calculate(temprature, maxTemprature, tempraturePrecision);
-		
-		gasData = new CalcMaterial("gas");
-		gasData->DOSmode = gasData->gas_plasma;
-		gasData->initMaterial(workPiece, DOS);
-		gasData->calculate(temprature, maxTemprature, tempraturePrecision);
-
-		Plot plot;
-		plot.init(".");
-		plot.plotTripple("Degree of ionization, lattice",
-			"Degree of ionization, gas",
-			"Degree of ionization, nuclei",
-			gasData->TsInUnit(), matData->Z_l, gasData->Z_l, ionData.Z_l, gasData->TUnit, "Z_l_comb.pdf");
-		plot.plotTripple("${\\mu}$/eV lattice", 
-			"${\\mu}$/eV gas",
-			"${\\mu}$/eV nuclei",
-			gasData->TsInUnit(), matData->mus, gasData->mus, ionData.mus, gasData->TUnit, "mu_comb.pdf");
-		plot.plotTripple("${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ lattice",
-			"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ gas",
-			"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ nuclei",
-			gasData->TsInUnit(), matData->C_e, gasData->C_e, ionData.C_e, gasData->TUnit, "C_e_comb.pdf");
-		plot.plotTripple("${U}$/J${\\cdot}$m${^{-3}}$ lattice", 
-			"${U}$/J${\\cdot}$m${^{-3}}$ gas",
-			"${U}$/J${\\cdot}$m${^{-3}}$ nuclei",
-			gasData->TsInUnit(), matData->U_e, gasData->U_e, ionData.U_e, gasData->TUnit, "U_e_comb.pdf");
-		gasData->averageZ(&ionData);
+		if(0){
+			matData->doPlots = 0;
+			for (double i = 1; i < 20000; i*=pow(2,0.1))
+			{
+				Vratio = i;
+				matData->VratioDefault = Vratio;
+				matData->calculate(temprature, maxTemprature, tempraturePrecision);
+				matData->write("V_"+std::to_string(Vratio));
+			}
+		}else{
+			matData->VratioDefault = Vratio;
+			matData->calculate(temprature, maxTemprature, tempraturePrecision);
+			gasData = new CalcMaterial("gas");
+			gasData->DOSmode = gasData->gas_plasma;
+			gasData->initMaterial(workPiece, DOS);
+			gasData->VratioDefault = Vratio;
+			gasData->calculate(temprature, maxTemprature, tempraturePrecision);
+			ionData.VratioDefault = Vratio;
+			ionData.calculate(temprature, maxTemprature, tempraturePrecision);
+			Plot plot;
+			plot.init(".");
+			plot.plotTripple("Degree of ionization, lattice",
+				"Degree of ionization, gas",
+				"Degree of ionization, nuclei",
+				gasData->TsInUnit(), matData->Z_l, gasData->Z_l, ionData.Z_l, gasData->TUnit, "Z_l_comb.pdf");
+			plot.plotTripple("${\\mu}$/eV lattice", 
+				"${\\mu}$/eV gas",
+				"${\\mu}$/eV nuclei",
+				gasData->TsInUnit(), matData->mus, gasData->mus, ionData.mus, gasData->TUnit, "mu_comb.pdf");
+			plot.plotTripple("${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ lattice",
+				"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ gas",
+				"${C_e}$/J${\\cdot}$K${^{-1}\\cdot}$m${^{-3}}$ nuclei",
+				gasData->TsInUnit(), matData->C_e, gasData->C_e, ionData.C_e, gasData->TUnit, "C_e_comb.pdf");
+			plot.plotTripple("${U}$/J${\\cdot}$m${^{-3}}$ lattice", 
+				"${U}$/J${\\cdot}$m${^{-3}}$ gas",
+				"${U}$/J${\\cdot}$m${^{-3}}$ nuclei",
+				gasData->TsInUnit(), matData->U_e, gasData->U_e, ionData.U_e, gasData->TUnit, "U_e_comb.pdf");
+		//gasData->averageZ(&ionData);
+		}
 		
 	}
 	void setLaser(double lambda, double fwhm, double pulsewidth,
@@ -92,7 +113,7 @@ public:
 		drilling.FWHM = fwhm;
 		drilling.pulseWidth = pulsewidth;
 		drilling.pulseFrequency = pulsefrequency;
-		drilling.pulseEnergy = power;
+		drilling.pulseEnergy = power/pulsefrequency;
 
 		double nu = c/lambda;
 		double E_ph = nu*h/q_e;
@@ -104,8 +125,13 @@ public:
 		"Pulse width="<<pulsewidth*1e15<<"fs"<<std::endl<<
 		"Pulse frequency="<<pulsefrequency<<"Hz"<<std::endl<<
 		"Pulse energy="<<power/pulsefrequency<<"J"<<std::endl<<
-		"Instant flux="<<power/pulsefrequency/fwhm/fwhm/pulsewidth*1e-4<<"W/cm2"<<std::endl<<
-		"Laser radius="<<fwhm*1e6<<"um"<<std::endl;
+		"Instant flux="<<power/pulsefrequency/fwhm/fwhm/pulsewidth*8/pow(2*PI,1.5)*1e-4<<"W/cm2"<<std::endl<<
+		"Focal diameter="<<fwhm*1e6<<"um"<<std::endl;
+	}
+	double laserStrength(double t, double dx){
+		return drilling.pulseEnergy/pow(2*PI,1.5)/pow(drilling.FWHM/2,2)/drilling.pulseWidth*2
+		*exp(-pow(t/drilling.pulseWidth,2)*2)*exp(-pow(dx/drilling.FWHM,2)*2);
+
 	}
 	void setLaser(laser las){
 		drilling = las;
