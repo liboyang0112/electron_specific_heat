@@ -50,29 +50,36 @@ int main(int argc, char const *argv[])
 		mkdir("FV/e",S_IRWXU);
 		mkdir("FV/E",S_IRWXU);
 	Experiment experiment;
-	experiment.setLaser(1e-6, 10e-6, 2e-15, 1e5, 10);
+	experiment.setLaser(1e-6, 10e-6, 250e-15, 1e5, 10);
 	//experiment.setLaser(1e-6, 20e-6, 10e-12, 1e5, 20);
 	//experiment.setLaser(1e-6, 20e-6, 10e-9, 1, 2e-3);
 	double reflectance = 0.8;
 	std::vector<double> vtime;
 	std::vector<double> vx;
 	std::vector<double> vTs;
-	std::vector<std::vector<double>*> vve;
-	std::vector<std::vector<double>*> vvE;
-	std::vector<std::vector<double>*> vvv;
-	std::vector<std::vector<double>*> vvZ;
-	std::vector<std::vector<double>*> vvrhoe;
-	std::vector<std::vector<double>*> vvp;
-	std::vector<std::vector<double>*> vvrho;
-	std::vector<std::vector<double>*> vvT;
-	std::vector<std::vector<double>*> vvZvsVT;
-	std::vector<std::vector<double>*> vvUinvsVT;
+	std::vector<std::vector<double>*> vvee;  //electron internal energy
+	std::vector<std::vector<double>*> vveE;  //electron total energy
+	std::vector<std::vector<double>*> vvev;  //electron velosity
+	std::vector<std::vector<double>*> vverho;//electron density
+	std::vector<std::vector<double>*> vvep;  //electron pressure
+	std::vector<std::vector<double>*> vveT;  //electron temperature
+	
+	std::vector<std::vector<double>*> vvarho;//atom density
+	std::vector<std::vector<double>*> vvav;  //atom velosity
+	std::vector<std::vector<double>*> vvap;  //atom pressure
+	std::vector<std::vector<double>*> vvaT;  //atom temperature
+	std::vector<std::vector<double>*> vvZ;   //ionization depth
+
+	std::vector<std::vector<double>*> vvEF;  //electric field
+
+	std::vector<std::vector<double>*> vvZvsVT; //Z(V,Te) function
+	std::vector<std::vector<double>*> vvUinvsVT; //U(V,Te) function
 
 	material mat = Cu;
 	double Nn=mat.rho*N_A/mat.n;
 	double vol = 1;
 	double airthickness = 1e-8;
-	double matthickness = 2e-8;
+	double matthickness = 1e-7;
 	double dx = 1e-10;
 	int nmeshpoints = round((airthickness+matthickness)/dx);
 
@@ -156,7 +163,7 @@ int main(int argc, char const *argv[])
 	double CFLmaxpoint;
 	double CFLmaxt;
 	double endt = 1e-9;
-	double dt = 1e-15;
+	double dt = 1e-16;
 	double recorddt = 1e-14;
 	double recorded = 0;
 	double ndelete = 0;
@@ -219,12 +226,13 @@ int main(int argc, char const *argv[])
 				double gammal = isSolid?0.5*vl*rhol:((Al*Bl+vl*Cl)*rhol);
 
 				double rrho = rhol/mat.rho;
-				double pmol = 0;//mat.bindingE*Nn*q_e*2*(pow(rrho,4)-pow(rrho,2)); //pressure caused by forces between atoms
-				double emol = 0;//mat.bindingE*Nn*q_e*(pow(rrho,4)-2*rrho*rrho);  //binding energy
-				double dpl = pmol+(isSolid?0.5*vl*fabs(vl)*rhol:(2*PI*Al*Al*Cl*rhol+vl*gammal));
+				double pmol = mat.bindingE*Nn*q_e*2*(pow(rrho,4)-pow(rrho,2));
+				double emol = mat.bindingE*Nn*q_e*(pow(rrho,4)-2*rrho*rrho);
+				double dpl = pmol+isSolid?0.5*vl*fabs(vl)*rhol:(2*PI*Al*Al*Cl*rhol+vl*gammal);
 				//if(fabs(i-airthickness/dx)<10 && time >= 319e-15) printf("rrho=%e, pmol=%e, dpl=%e, i=%d, j=%d\n", rrho, pmol,(2*PI*Al*Al*Cl*rhol+vl*gammal),i,j);
 				double del = isSolid?gammal*(0.5*vvE.back()->at(i-j)*fabs(vl)):((4*PI*pow(Al,3)*Bl+5*PI*Al*Al*vl*Cl)*rhol+0.5*vl*vl*gammal+emol*gammal/rhol);
-				double bouncebackrate = /*isSolid?0:*/(i-!j==nmeshpoints?1:std::min(pow(vvrho.back()->at(i-!j)/mat.rho,2./3),1.));
+				double bouncebackrate = isSolid?0:(i-!j==nmeshpoints?1:std::min(pow(vvrho.back()->at(i-!j)/mat.rho,2./3),1.));
+				double r0 = pow(mat.n/N_A/mat.rho,1./3);
 				double CFL = gammal/rhol*dt/dx;
 				if(CFLmax<CFL){
 					CFLmax = CFL;
@@ -238,7 +246,7 @@ int main(int argc, char const *argv[])
 				}else {
 
 					if(j==1){
-							phipl[phipl.size()-1]+=dpl*dt;//*(1-bouncebackrate)+1*dpl*dt*bouncebackrate;
+							phipl[phipl.size()-1]+=dpl*dt*(1+bouncebackrate);//*(1-bouncebackrate)+1*dpl*dt*bouncebackrate;
 							//phipr[phipl.size()-1]-=dpl*dt*(1-bouncebackrate)+2*dpl*dt*bouncebackrate;
 							phie[phie.size()-1]+=del*dt*(1-bouncebackrate);
 							phi[phi.size()-1]+=gammal*dt*(1-bouncebackrate);
@@ -249,11 +257,11 @@ int main(int argc, char const *argv[])
 						phi[phi.size()-1]-=gammal*dt*(1-bouncebackrate);
 					}
 				}
-				if(fabs(i-airthickness/dx)<10)// && (i==100||i==101))
-					printf("isSolid %d, rrho=%e, Al=%e, Bl=%e, Cl=%e, v=%e, gammal=%e, del=%e, dpl=%e, pmol=%e, i=%d, j=%d\n",isSolid, rrho, Al, Bl, Cl, vvv.back()->at(i-j)/rhol/dx, gammal*dt,del*dt,dpl*dt,pmol, i,j);
+				//if(fabs(i-airthickness/dx)<10 && time >= 319e-15)// && (i==100||i==101))
+				//	printf("isSolid %d, Al=%e, Bl=%e, Cl=%e, v=%e, gammal=%e, del=%e, dpl=%e, pmol=%e, i=%d, j=%d\n",isSolid, Al, Bl, Cl, vvv.back()->at(i-j)/rhol/dx, gammal*dt,del*dt,dpl*dt,pmol, i,j);
 			}//
-				if(abs(i-airthickness/dx)<10)
-					printf("gammal=%e, del=%e, i=%d\n", phi.back(),phie.back(),i);
+				//if(abs(i-airthickness/dx)<10 && time >= 319e-15)
+				//	printf("gammal=%e, del=%e, i=%d\n", phi.back(),phie.back(),i);
 		}
 		//Calcualte changes
 		for (int i = 0; i < nmeshpoints-1; ++i)
@@ -261,18 +269,14 @@ int main(int argc, char const *argv[])
 			double tmprho = vvrho.back()->at(i+1);
 			Tstep = order_in(vTs,vvT.back()->at(i+1));
 			tmpvrho->push_back(tmprho+(phi[i]-phi[i+1])/dx);
-			if(tmpvrho->back()>mat.rho) {
-				printf("rho=%e, drho=%e", tmprho, (phi[i]-phi[i+1])/dx);
-				exit(0);
-			}
 			de = phie[i]-phie[i+1];
 			double dE = de;
-			bool isSolid = vvZ.back()->at(i)<1 && tmprho>0.9*mat.rho;
-			dv = (isSolid || vvrho.back()->at(i+1)>=mat.rho)?0:(phipl[i]-phipr[i]-phipl[i+1]+phipr[i+1]);
+			dv = phipl[i]-phipr[i]-phipl[i+1]+phipr[i+1];
 			//if(fabs(i-airthickness/dx)<10 && time>319e-15) printf("dp1=%e, dp2=%e, dp=%e, drho=%e\n", phipl[i]-phipr[i], 
 			//	-phipl[i+1]+phipr[i+1], dv, 
 			//	tmprho+(phi[i]-phi[i+1])/
 			//	dx-(i>airthickness/dx?mat.rho:0));
+
 //			if(dv>0) exit(0);
 			double dep = 0;
 			double rrho = tmpvrho->back()/mat.rho;
@@ -299,11 +303,11 @@ int main(int argc, char const *argv[])
 				rhoe=Z*tmprho/mat.n*N_A;
 				T = vvT.back()->at(i+1);
 				if(tmprho==0) T = vvT.back()->at(i+2);
-				if(tmprho>1){
+				if(tmprho>1e-20){
 					//alpha = 1e8*tmprho;
 					getRandAlphaMat(mat, rhoe, mat.rho/tmprho, 1e-6, 300, vvT.back()->at(i+1)*eVtoK, reflectance, alpha);
 					if(reflectance>maxreflect) maxreflect = reflectance;
-					alpha = alpha*tmprho/mat.rho;
+					alpha = tmprho>1?alpha*tmprho/mat.rho:0;
 					//if(tmpvrho->back()>8000)
 					double abs =experiment.laserStrength(time-2*experiment.drilling.pulseWidth,0)*dt*(1-maxreflect)*dx*alpha*Ileft;
 					de += abs;
@@ -316,7 +320,7 @@ int main(int argc, char const *argv[])
 					Ileft *= -(dx*alpha-1);
 				}
 				if(!isfinite(T)||T<0) exit(0);
-				par.param1 = 3./2*q_e*Z*T+de/(tmpvrho->back()*dx/mat.n*N_A)+Uin;
+				par.param1 = 3./2*q_e*Z*vvT.back()->at(i+1)+de/(tmpvrho->back()*dx/mat.n*N_A)+Uin;
 				//if(time>319e-15 && abs(i-airthickness/dx)<10) printf("param1=%e, %d\n", par.param1, i);
 				par.Nn = Nn;
 				par.vcZvsT = &vcZvsT;
@@ -337,7 +341,7 @@ int main(int argc, char const *argv[])
 				p=0;
 			}
 
-			tmpvv->push_back(std::min(vvv.back()->at(i+1)+dv,0.));
+			tmpvv->push_back(vvv.back()->at(i+1)+dv);
 			tmpve->push_back(vve.back()->at(i+1)+de);
 			tmpvve.push_back(tmpvv->back()/tmpvrho->back()/dx);
 			tmpvT->push_back(T);
@@ -357,7 +361,7 @@ int main(int argc, char const *argv[])
 //		plot.plotSingle("rho"+std::to_string(time*1e15),vx,*tmpvrho,"x/m","rho"+std::to_string(time*1e15)+".png");
 		//if(time>5000e-15) {
 		//printf("CFLmax: %f, at x=%f, t=%e\n", CFLmax, CFLmaxpoint, CFLmaxt);
-		if(round((time-recorded)*1e15)>=0) {
+		if(round((time-recorded)*1e15)>=0 &&time>320e-15) {
 			
 			if(time>1000e15) recorded=10*recorddt+time;
 			if(time>10000e15) recorded=100*recorddt+time;

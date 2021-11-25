@@ -23,6 +23,8 @@ typedef struct {
 	double lambdaOmega2_meV; // Z. Lin, L. V. Zhigilei, and V. Celli, Phys. Rev. B 77, 075133 (2008).
 	double workFunc; //https://chem.libretexts.org/Ancillary_Materials/Reference/Reference_Tables/Bulk_Properties/B1%3A_Workfunction_Values_(Reference_Table)
 //	double epsiloninfty;
+	double bindingE; 
+	double YoungsModulus; 
 } material;
 
 const material Cu = {
@@ -37,6 +39,8 @@ const material Cu = {
 	29,
 	5,
 //	3.8
+	5,
+	2e-11
 };
 const material Al = {
 	"Al",
@@ -50,6 +54,8 @@ const material Al = {
 	29,
 	5,
 //	3.8
+	5,
+	2e-11
 };
 const material Ag = {
 	"Ag",
@@ -61,8 +67,10 @@ const material Ag = {
 	2.0e-15,
 	215,
 	22.5,
-	4.5
+	4.5,
 //	3.8
+	5,
+	2e-11
 };
 const material Au = {
 	"Au",
@@ -74,8 +82,10 @@ const material Au = {
 	2.5e-15,
 	169,
 	23,
-	5.2
+	5.2,
 //	3.8
+	5,
+	2e-11
 };
 
 
