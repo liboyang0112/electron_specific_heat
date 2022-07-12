@@ -74,7 +74,7 @@ int main(int argc, char const *argv[])
 	plot.plotSingle("Alpha",wls,Alphas,"reached energy","Alpha.pdf");
 	plot.plotSingle("R",wls,Rs,"reached energy","R.pdf");
 	plot.plotSingle("incs",wls,incs,"reached energy","incs.pdf");
-*/
+
 	std::vector<double> vZvsV;
 	std::vector<double> vUbarvsV;
 	std::vector<double> vZvsT[190];
@@ -89,5 +89,15 @@ int main(int argc, char const *argv[])
 
 	plot.plotTripple("Z, rV=1","Z, rV=2","Z, rV=3",vT,vZvsT[0],vZvsT[1],vZvsT[2],"T/eV","ZdiffV.pdf");
 	plot.plotTripple("Ubar, rV=1","Ubar, rV=2","Ubar, rV=3",vT,vUbarvsT[0],vUbarvsT[1],vUbarvsT[2],"T/eV","UbardiffV.pdf");
-	return 0;
+	*/
+
+double k_B = 3.285e4;
+double rho0_water=1./0.5824;
+double rho0_f = 1.3897e-3;
+double phi_fluid_initial = 0.6;
+double alpha_water=7.438e4;
+double ratio = 1./(1-rho0_f/rho0_water);
+double ret = rho0_f*k_B*phi_fluid_initial*ratio-alpha_water*rho0_f*rho0_f;
+printf("%e\n", ret);
+return 0;
 }

@@ -11,4 +11,6 @@ const double q_e = 1.602176634e-19;
 const double epsilon_0 = 8.854187817E-12;
 const double c = 3e8;
 const double eVtoK = q_e/k_B;
+const double m_nuc = 1.661e-27;
+const double mu_B = 9.27400949e-24;
 #endif

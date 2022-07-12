@@ -13,6 +13,7 @@ void Plot::init(std::string name){
 }
 
 void Plot::plotFreeNandF(double maxEpsilon, int nPoints, double x2, double y, std::string savename){
+    plt::clf();
 	std::cout<<"plot N and f: "<<savename<<std::endl;
 	std::vector<double> epsilon;
 	std::vector<double> f;
@@ -38,62 +39,61 @@ void Plot::plotFreeNandF(double maxEpsilon, int nPoints, double x2, double y, st
     plt::named_semilogx("能级密度", epsilon, N);
     plt::legend();
     plt::save(savename);
-    plt::clf();
 }
 
 void Plot::plotSingle(std::string name, std::vector<double> x, std::vector<double> y, std::string xlabel, std::string savename){
+    plt::clf();
     if(x.size()!=y.size()) printf("Plot::plotSingle : ERROR: x length %lu not equal to y length %lu\n", x.size(), y.size());
     plt::named_plot(name, x, y);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotSingle : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }
 
 void Plot::plotSingleLogX(std::string name, std::vector<double> x, std::vector<double> y, std::string xlabel, std::string savename){
+    plt::clf();
     plt::named_semilogx(name, x, y);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotSingle : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }
 void Plot::plotSingleLogY(std::string name, std::vector<double> x, std::vector<double> y, std::string xlabel, std::string savename){
+    plt::clf();
     plt::named_semilogy(name, x, y);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotSingle : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }
 
 void Plot::plotSingleLogXY(std::string name, std::vector<double> x, std::vector<double> y, std::string xlabel, std::string savename){
+    plt::clf();
     plt::named_loglog(name, x, y);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotSingle : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }
 
 void Plot::plotDouble(std::string name1, std::string name2, std::vector<double> x, std::vector<double> y1, std::vector<double> y2, std::string xlabel, std::string savename){
+    plt::clf();
     plt::named_semilogx(name1, x, y1);
     plt::named_semilogx(name2, x, y2);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotDouble : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }
 
 void Plot::plotTripple(std::string name1, std::string name2, std::string name3, std::vector<double> x, std::vector<double> y1, std::vector<double> y2, std::vector<double> y3, std::string xlabel, std::string savename){
-    plt::named_semilogx(name1, x, y1);
-    plt::named_semilogx(name2, x, y2);
-    plt::named_semilogx(name3, x, y3);
+    plt::clf();
+    plt::named_plot(name1, x, y1);
+    plt::named_plot(name2, x, y2);
+    plt::named_plot(name3, x, y3);
     plt::xlabel(xlabel,legend_option);
     plt::legend(legend_option);
     std::cout<<"Plot::plotTripple : INFO Saving file to "<<outputpath+"/"+savename<<std::endl;
     plt::save(outputpath+"/"+savename);
-    plt::clf();
 }

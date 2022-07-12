@@ -8,7 +8,7 @@ project(electron_heat_capacity)
 
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
-find_package(Python 3.9 REQUIRED)
+find_package(Python 3.10 REQUIRED)
 find_package(PythonLibs REQUIRED) 
 find_package(GSL REQUIRED)
 
@@ -34,5 +34,5 @@ foreach( sourcefile ${APP_SOURCES} )
     string( REPLACE ".C" "_run" exename ${sourcefile} )
     string( REPLACE "util/" "" exename ${exename} )
     add_executable( ${exename} ${sourcefile})
-	target_link_libraries(${exename} plot yaml-cpp)
+	target_link_libraries(${exename} plot yaml-cpp plotter)
 endforeach( sourcefile ${APP_SOURCES} )
